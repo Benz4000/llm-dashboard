@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Free LLM Usage</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f6f4;
+  --surface: #fcfcfb;
+  --surface-2: #f0efec;
+  --border: #e2e1dc;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #7a7974;
+  --grid: #e8e7e3;
+  --accent: #2a78d6;
+  --gemini: #2a78d6;
+  --groq: #eb6834;
+  --cerebras: #1baf7a;
+  --openrouter: #eda100;
+  --other: #8a8984;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --border: #2f2f2c;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --text-3: #8f8e86;
+    --grid: #2a2a28;
+    --accent: #3987e5;
+    --gemini: #3987e5;
+    --groq: #d95926;
+    --cerebras: #199e70;
+    --openrouter: #c98500;
+    --other: #77766f;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --border: #2f2f2c;
+  --text: #f0efec; --text-2: #c3c2b7; --text-3: #8f8e86; --grid: #2a2a28;
+  --accent: #3987e5; --gemini: #3987e5; --groq: #d95926; --cerebras: #199e70;
+  --openrouter: #c98500; --other: #77766f;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--text-2); font-size: 13px; margin-top: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; color: var(--text-2); padding: 6px 12px; font: inherit; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); font-weight: 600; }
+.btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 6px 12px; font: inherit; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn:disabled { opacity: .6; cursor: default; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.grid { display: grid; gap: 12px; }
+.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
+.kpi .label { color: var(--text-2); font-size: 12px; }
+.kpi .value { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.kpi .note { color: var(--text-3); font-size: 12px; }
+.providers { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
+.prov h3 { margin: 0 0 10px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.prov .big { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.prov dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 8px 0 0; font-size: 12px; }
+.prov dt { color: var(--text-2); }
+.prov dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.meter { margin-top: 10px; }
+.meter .bar { height: 6px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.meter .fill { height: 100%; border-radius: 4px; }
+.meter .cap { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); margin-top: 4px; }
+.status { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); }
+.status i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 12px; }
+.section-title h2 { font-size: 15px; margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: 240px; overflow: visible; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); min-width: 150px; opacity: 0; transition: opacity .1s; z-index: 2; }
+.tip .row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.tip .row span:first-child { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.tip b { font-variant-numeric: tabular-nums; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--text-2); font-weight: 500; font-size: 12px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; }
+.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-top: 12px; }
+.empty { color: var(--text-2); padding: 24px 0; text-align: center; }
+.setup { max-width: 520px; margin: 40px auto; }
+.setup label { display: block; font-size: 12px; color: var(--text-2); margin: 12px 0 4px; }
+.setup input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+.setup p { color: var(--text-2); font-size: 13px; }
+.err { color: var(--critical); font-size: 13px; margin-top: 8px; min-height: 1em; }
+.limits input { width: 80px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; text-align: right; }
+.foot { color: var(--text-3); font-size: 12px; margin-top: 16px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+.linkbtn { background: none; border: 0; color: var(--text-2); text-decoration: underline; cursor: pointer; font: inherit; padding: 0; }
+@media (max-width: 860px) {
+  .kpis, .providers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .two { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .providers { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+  .kpi .value { font-size: 22px; }
+  .prov .big { font-size: 20px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Free LLM Usage</h1>
+      <div class="sub" id="subtitle">Requests through your LiteLLM proxy, by provider</div>
+    </div>
+    <div class="controls" id="controls" hidden>
+      <div class="seg" role="group" aria-label="Date range">
+        <button data-range="1" aria-pressed="false">Today</button>
+        <button data-range="7" aria-pressed="true">7 days</button>
+        <button data-range="30" aria-pressed="false">30 days</button>
+      </div>
+      <button class="btn" id="refresh">Refresh</button>
+    </div>
+  </header>
+
+  <section id="setup" class="card setup" hidden>
+    <h2 style="margin:0 0 4px;font-size:16px">Connect to your proxy</h2>
+    <p>Your master key is saved only in this browser on this device. It is never added to the page or the GitHub repo.</p>
+    <label for="url">Proxy URL</label>
+    <input id="url" type="url" autocomplete="off" spellcheck="false">
+    <label for="key">Master key</label>
+    <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-...">
+    <div class="err" id="setupErr"></div>
+    <div style="margin-top:12px"><button class="btn primary" id="connect">Connect</button></div>
+  </section>
+
+  <main id="dash" hidden>
+    <div class="grid kpis" id="kpis"></div>
+    <div class="grid providers" id="providers"></div>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>Requests per day</h2>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="chart" id="chart"></div>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;color:var(--text-2);font-size:12px">Show as table</summary>
+        <div class="scroll" id="dayTable" style="margin-top:8px"></div>
+      </details>
+    </section>
+
+    <div class="grid two">
+      <section class="card">
+        <div class="section-title"><h2>By model</h2></div>
+        <div class="scroll" id="models"></div>
+      </section>
+      <section class="card">
+        <div class="section-title"><h2>Daily free limits</h2><span class="sub">Your own numbers, for the meters</span></div>
+        <div id="limits" class="limits"></div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:12px">
+      <div class="section-title"><h2>Recent requests</h2><span class="sub" id="recentNote"></span></div>
+      <div class="scroll" id="recent"></div>
+    </section>
+
+    <div class="foot">
+      <span id="updated"></span>
+      <span><button class="linkbtn" id="disconnect">Disconnect this device</button></span>
+    </div>
+  </main>
+</div>
+
+<script>
+(() => {
+  const DEFAULT_URL = "https://litellm-316552339089.us-central1.run.app";
+  const PROVIDERS = [
+    { id: "gemini", name: "Gemini", color: "var(--gemini)" },
+    { id: "groq", name: "Groq", color: "var(--groq)" },
+    { id: "cerebras", name: "Cerebras", color: "var(--cerebras)" },
+    { id: "openrouter", name: "OpenRouter", color: "var(--openrouter)" },
+  ];
+  const OTHER = { id: "other", name: "Other", color: "var(--other)" };
+  const PMAP = Object.fromEntries([...PROVIDERS, OTHER].map(p => [p.id, p]));
+
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("llmdash." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("llmdash." + k, JSON.stringify(v)); } catch {} },
+    del(k) { try { localStorage.removeItem("llmdash." + k); } catch {} },
+  };
+
+  let cfg = { url: store.get("url", DEFAULT_URL), key: store.get("key", "") };
+  let range = store.get("range", 7);
+  let limits = store.get("limits", {});
+  let rows = [];
+
+  const $ = id => document.getElementById(id);
+  const fmt = n => (n ?? 0).toLocaleString();
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad = n => String(n).padStart(2, "0");
+  const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const utcStamp = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+  const parseTime = t => {
+    if (!t) return null;
+    let s = String(t);
+    if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) s = s.replace(" ", "T") + "Z";
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  };
+
+  function providerOf(r) {
+    const hay = [r.custom_llm_provider, r.model, r.api_base, r.model_id].filter(Boolean).join(" ").toLowerCase();
+    if (/gemini|generativelanguage|vertex/.test(hay)) return "gemini";
+    if (/groq/.test(hay)) return "groq";
+    if (/cerebras/.test(hay)) return "cerebras";
+    if (/openrouter/.test(hay)) return "openrouter";
+    return "other";
+  }
+  function isFailure(r) {
+    const s = String(r.status || "").toLowerCase();
+    return s === "failure" || s === "error" || s === "failed";
+  }
+  function latencyMs(r) {
+    const a = parseTime(r.startTime), b = parseTime(r.endTime);
+    return a && b ? Math.max(0, b - a) : null;
+  }
+
+  async function api(path) {
+    const res = await fetch(cfg.url.replace(/\/+$/, "") + path, { headers: { Authorization: "Bearer " + cfg.key } });
+    if (res.status === 401 || res.status === 403) throw new Error("The proxy rejected that key. Check the master key.");
+    if (!res.ok) throw new Error(`Proxy returned ${res.status} for ${path.split("?")[0]}`);
+    return res.json();
+  }
+
+  async function fetchLogs(days) {
+    const end = new Date(Date.now() + 60 * 1000);
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (days - 1));
+    const qs = `start_date=${encodeURIComponent(utcStamp(start))}&end_date=${encodeURIComponent(utcStamp(end))}`;
+    const out = [];
+    const pageSize = 100;
+    for (let page = 1; page <= 100; page++) {
+      const data = await api(`/spend/logs/ui?${qs}&page=${page}&page_size=${pageSize}`);
+      const list = Array.isArray(data) ? data : (data.data || []);
+      out.push(...list);
+      const totalPages = data.total_pages ?? (list.length < pageSize ? page : page + 1);
+      if (page >= totalPages || list.length === 0) break;
+    }
+    return out;
+  }
+
+  function summarize() {
+    const days = [];
+    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (range - 1));
+    for (let i = 0; i < range; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(dayKey(d)); }
+    const todayKey = dayKey(new Date());
+    const byProv = {}, byDay = {}, byModel = {};
+    for (const p of [...PROVIDERS, OTHER]) byProv[p.id] = { req: 0, ok: 0, fail: 0, tokens: 0, lat: [], today: 0, last: null };
+    for (const d of days) byDay[d] = Object.fromEntries([...PROVIDERS, OTHER].map(p => [p.id, 0]));
+    for (const r of rows) {
+      const t = parseTime(r.startTime); if (!t) continue;
+      const pid = providerOf(r); const P = byProv[pid];
+      const fail = isFailure(r);
+      P.req++; fail ? P.fail++ : P.ok++;
+      P.tokens += Number(r.total_tokens) || 0;
+      const l = latencyMs(r); if (l != null && !fail) P.lat.push(l);
+      const k = dayKey(t);
+      if (k === todayKey) P.today++;
+      if (!P.last || t > P.last) P.last = t;
+      if (byDay[k]) byDay[k][pid]++;
+      const m = String(r.model || "unknown").replace(/^(gemini|groq|cerebras|openrouter)\//, "");
+      const mk = pid + "|" + m;
+      byModel[mk] ??= { pid, model: m, req: 0, fail: 0, tokens: 0 };
+      byModel[mk].req++; if (fail) byModel[mk].fail++;
+      byModel[mk].tokens += Number(r.total_tokens) || 0;
+    }
+    return { days, byProv, byDay, byModel };
+  }
+
+  function median(a) { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+  function ago(d) {
+    if (!d) return "never";
+    const s = (Date.now() - d) / 1000;
+    if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + " min ago";
+    if (s < 86400) return Math.floor(s / 3600) + " h ago"; return Math.floor(s / 86400) + " d ago";
+  }
+
+  function render() {
+    const S = summarize();
+    const all = Object.values(S.byProv);
+    const total = all.reduce((a, p) => a + p.req, 0);
+    const fails = all.reduce((a, p) => a + p.fail, 0);
+    const tokens = all.reduce((a, p) => a + p.tokens, 0);
+    const active = PROVIDERS.filter(p => S.byProv[p.id].req > 0).length;
+    const rangeLabel = range === 1 ? "today" : `last ${range} days`;
+
+    $("kpis").innerHTML = [
+      ["Requests", fmt(total), rangeLabel],
+      ["Success rate", total ? (Math.round(((total - fails) / total) * 1000) / 10) + "%" : "—", fails ? `${fmt(fails)} failed` : "no failures"],
+      ["Tokens", fmt(tokens), "prompt + completion"],
+      ["Providers used", `${active} of ${PROVIDERS.length}`, rangeLabel],
+    ].map(([l, v, n]) => `<div class="card kpi"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join("");
+
+    const provList = S.byProv.other.req ? [...PROVIDERS, OTHER] : PROVIDERS;
+    $("providers").innerHTML = provList.map(p => {
+      const P = S.byProv[p.id];
+      const lim = Number(limits[p.id]) || 0;
+      const pct = lim ? Math.min(100, (P.today / lim) * 100) : 0;
+      const meterColor = pct >= 90 ? "var(--critical)" : pct >= 70 ? "var(--warning)" : p.color;
+      const st = P.req === 0 ? ["var(--text-3)", "Unused"] : P.fail && P.fail / P.req > 0.2 ? ["var(--critical)", "Errors"] : ["var(--good)", "Working"];
+      const med = median(P.lat);
+      return `<div class="card prov">
+        <h3><span class="swatch" style="background:${p.color}"></span>${p.name}
+          <span class="status" style="margin-left:auto"><i style="background:${st[0]}"></i>${st[1]}</span></h3>
+        <div class="big">${fmt(P.req)}</div>
+        <div class="sub">requests ${rangeLabel}</div>
+        <dl>
+          <dt>Tokens</dt><dd>${fmt(P.tokens)}</dd>
+          <dt>Failed</dt><dd>${fmt(P.fail)}</dd>
+          <dt>Median time</dt><dd>${med == null ? "—" : (med / 1000).toFixed(1) + " s"}</dd>
+          <dt>Last used</dt><dd>${ago(P.last)}</dd>
+        </dl>
+        <div class="meter">
+          <div class="bar"><div class="fill" style="width:${lim ? pct : 0}%;background:${meterColor}"></div></div>
+          <div class="cap"><span>Today ${fmt(P.today)}</span><span>${lim ? "of " + fmt(lim) : "no limit set"}</span></div>
+        </div>
+      </div>`;
+    }).join("");
+
+    $("legend").innerHTML = provList.map(p => `<span><span class="swatch" style="background:${p.color}"></span>${p.name}</span>`).join("");
+    renderChart(S, provList);
+
+    $("dayTable").innerHTML = `<table><thead><tr><th>Day</th>${provList.map(p => `<th class="num">${p.name}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>${
+      S.days.slice().reverse().map(d => { const v = S.byDay[d]; const t = provList.reduce((a, p) => a + v[p.id], 0);
+        return `<tr><td>${d}</td>${provList.map(p => `<td class="num">${fmt(v[p.id])}</td>`).join("")}<td class="num">${fmt(t)}</td></tr>`; }).join("")
+    }</tbody></table>`;
+
+    const models = Object.values(S.byModel).sort((a, b) => b.req - a.req);
+    $("models").innerHTML = models.length ? `<table><thead><tr><th>Model</th><th class="num">Requests</th><th class="num">Failed</th><th class="num">Tokens</th></tr></thead><tbody>${
+      models.map(m => `<tr><td><span class="swatch" style="background:${PMAP[m.pid].color};margin-right:6px"></span>${esc(m.model)}</td><td class="num">${fmt(m.req)}</td><td class="num">${fmt(m.fail)}</td><td class="num">${fmt(m.tokens)}</td></tr>`).join("")
+    }</tbody></table>` : `<div class="empty">No requests yet in this range.</div>`;
+
+    $("limits").innerHTML = `<table><tbody>${PROVIDERS.map(p => `<tr><td><span class="swatch" style="background:${p.color};margin-right:6px"></span>${p.name}</td>
+      <td class="num"><input type="number" min="0" step="1" data-lim="${p.id}" value="${limits[p.id] ?? ""}" placeholder="—" aria-label="${p.name} daily request limit"> req/day</td></tr>`).join("")}</tbody></table>
+      <p class="sub" style="margin:8px 0 0">Look up each provider's current free-tier limit in its console and enter it here. Saved on this device only.</p>`;
+    document.querySelectorAll("[data-lim]").forEach(inp => inp.addEventListener("change", e => {
+      const v = e.target.value.trim(); if (v === "") delete limits[e.target.dataset.lim]; else limits[e.target.dataset.lim] = Number(v);
+      store.set("limits", limits); render();
+    }));
+
+    const recent = rows.slice().sort((a, b) => (parseTime(b.startTime) || 0) - (parseTime(a.startTime) || 0)).slice(0, 50);
+    $("recentNote").textContent = recent.length ? `latest ${recent.length}` : "";
+    $("recent").innerHTML = recent.length ? `<table><thead><tr><th>Time</th><th>Provider</th><th>Model</th><th class="num">Tokens</th><th class="num">Time taken</th><th>Status</th></tr></thead><tbody>${
+      recent.map(r => { const pid = providerOf(r); const t = parseTime(r.startTime); const l = latencyMs(r); const f = isFailure(r);
+        return `<tr><td>${t ? t.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}</td>
+        <td><span class="swatch" style="background:${PMAP[pid].color};margin-right:6px"></span>${PMAP[pid].name}</td>
+        <td>${esc(String(r.model || "").replace(/^(gemini|groq|cerebras|openrouter)\//, ""))}</td>
+        <td class="num">${fmt(Number(r.total_tokens) || 0)}</td>
+        <td class="num">${l == null ? "—" : (l / 1000).toFixed(1) + " s"}</td>
+        <td><span class="status"><i style="background:${f ? "var(--critical)" : "var(--good)"}"></i>${f ? "Failed" : "OK"}</span></td></tr>`; }).join("")
+    }</tbody></table>` : `<div class="empty">No requests yet in this range.</div>`;
+
+    $("updated").textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function renderChart(S, provList) {
+    const el = $("chart");
+    const W = Math.max(320, el.clientWidth || 800), H = 240;
+    const m = { t: 8, r: 8, b: 26, l: 36 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const totals = S.days.map(d => provList.reduce((a, p) => a + S.byDay[d][p.id], 0));
+    const max = Math.max(4, ...totals);
+    const step = Math.pow(10, Math.floor(Math.log10(max / 4)));
+    const tick = [1, 2, 5, 10].map(x => x * step).find(x => max / x <= 5) || step * 10;
+    const top = Math.ceil(max / tick) * tick;
+    const y = v => m.t + ih - (v / top) * ih;
+    const n = S.days.length, slot = iw / n, bw = Math.max(4, Math.min(48, slot * 0.6));
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Requests per day by provider">`;
+    let hits = "", bars = "";
+    for (let v = 0; v <= top; v += tick) {
+      svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`;
+      svg += `<text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--text-3)">${fmt(v)}</text>`;
+    }
+    const labelEvery = Math.ceil(n / Math.max(1, Math.floor(iw / 56)));
+    S.days.forEach((d, i) => {
+      const cx = m.l + slot * i + slot / 2, x = cx - bw / 2;
+      let acc = 0;
+      const segs = provList.filter(p => S.byDay[d][p.id] > 0);
+      segs.forEach((p, si) => {
+        const v = S.byDay[d][p.id];
+        const y0 = y(acc), y1 = y(acc + v);
+        const isTop = si === segs.length - 1;
+        const gap = si > 0 ? 2 : 0;
+        const h = Math.max(1, y0 - y1 - gap);
+        const r = isTop ? Math.min(4, h, bw / 2) : 0;
+        const yy = y1;
+        bars += r
+          ? `<path d="M${x},${yy + h} V${yy + r} Q${x},${yy} ${x + r},${yy} H${x + bw - r} Q${x + bw},${yy} ${x + bw},${yy + r} V${yy + h} Z" fill="${p.color}" pointer-events="none"/>`
+          : `<rect x="${x}" y="${yy}" width="${bw}" height="${h}" fill="${p.color}" pointer-events="none"/>`;
+        acc += v;
+      });
+      if (i % labelEvery === 0 || i === n - 1) {
+        const [yy, mm, dd] = d.split("-").map(Number);
+        const lbl = new Date(yy, mm - 1, dd).toLocaleDateString([], { month: "short", day: "numeric" });
+        bars += `<text x="${cx}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--text-3)">${lbl}</text>`;
+      }
+      hits += `<rect class="hit" data-i="${i}" x="${m.l + slot * i}" y="${m.t}" width="${slot}" height="${ih}" fill="transparent"/>`;
+    });
+    svg += hits + bars + `<line x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--text-3)" stroke-width="1" pointer-events="none"/></svg><div class="tip" id="tip"></div>`;
+    el.innerHTML = svg;
+    const tip = $("tip");
+    el.querySelectorAll(".hit").forEach(h => {
+      h.addEventListener("mouseenter", () => h.setAttribute("fill", "var(--surface-2)"));
+      h.addEventListener("mouseleave", () => { h.setAttribute("fill", "transparent"); tip.style.opacity = 0; });
+      h.addEventListener("mousemove", e => {
+        const i = +h.dataset.i, d = S.days[i];
+        const [yy, mm, dd] = d.split("-").map(Number);
+        const lbl = new Date(yy, mm - 1, dd).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+        tip.innerHTML = `<div style="font-weight:600;margin-bottom:4px">${lbl}</div>` +
+          provList.slice().reverse().map(p => `<div class="row"><span><span class="swatch" style="background:${p.color}"></span>${p.name}</span><b>${fmt(S.byDay[d][p.id])}</b></div>`).join("") +
+          `<div class="row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px"><span>Total</span><b>${fmt(totals[i])}</b></div>`;
+        const r = el.getBoundingClientRect();
+        let left = e.clientX - r.left + 12; if (left + 170 > r.width) left = e.clientX - r.left - 182;
+        tip.style.left = Math.max(0, left) + "px"; tip.style.top = Math.max(0, e.clientY - r.top - 20) + "px"; tip.style.opacity = 1;
+      });
+    });
+  }
+
+  async function load() {
+    const btn = $("refresh"); btn.disabled = true; btn.textContent = "Loading…";
+    try {
+      rows = await fetchLogs(range);
+      render();
+    } catch (e) {
+      if (/rejected/.test(e.message)) { showSetup(e.message); return; }
+      $("updated").textContent = "Couldn't load: " + e.message;
+    } finally { btn.disabled = false; btn.textContent = "Refresh"; }
+  }
+
+  function showSetup(msg) {
+    $("dash").hidden = true; $("controls").hidden = true; $("setup").hidden = false;
+    $("url").value = cfg.url || DEFAULT_URL; $("key").value = "";
+    $("setupErr").textContent = msg || "";
+  }
+  function showDash() {
+    $("setup").hidden = true; $("dash").hidden = false; $("controls").hidden = false;
+    document.querySelectorAll("[data-range]").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.range === range)));
+    load();
+  }
+
+  $("connect").addEventListener("click", async () => {
+    const url = $("url").value.trim() || DEFAULT_URL, key = $("key").value.trim();
+    if (!key) { $("setupErr").textContent = "Enter your master key."; return; }
+    cfg = { url, key };
+    $("connect").disabled = true; $("setupErr").textContent = "";
+    try {
+      await api("/v1/models");
+      store.set("url", url); store.set("key", key);
+      showDash();
+    } catch (e) {
+      $("setupErr").textContent = e.message.includes("rejected") ? e.message : "Couldn't reach the proxy at that URL.";
+    } finally { $("connect").disabled = false; }
+  });
+  $("key").addEventListener("keydown", e => { if (e.key === "Enter") $("connect").click(); });
+  document.querySelectorAll("[data-range]").forEach(b => b.addEventListener("click", () => {
+    range = +b.dataset.range; store.set("range", range);
+    document.querySelectorAll("[data-range]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    load();
+  }));
+  $("refresh").addEventListener("click", load);
+  $("disconnect").addEventListener("click", () => { store.del("key"); cfg.key = ""; showSetup("Disconnected. Your key was removed from this browser."); });
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (!$("dash").hidden && rows) render(); }, 150); });
+  setInterval(() => { if (!$("dash").hidden && document.visibilityState === "visible") load(); }, 60000);
+
+  cfg.key ? showDash() : showSetup();
+})();
+</script>
+</body>
+</html>
