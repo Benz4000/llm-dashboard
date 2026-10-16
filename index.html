@@ -209,7 +209,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     { id: "cohere", name: "Cohere", color: "var(--cohere)" },
   ];
   const OTHER = { id: "other", name: "Other", color: "var(--other)" };
+  const EXTRA_COLORS = ["#6250d6", "#e34948", "#77766f", "#9a8f6a", "#3d7a8a"];
   const PMAP = Object.fromEntries([...PROVIDERS, OTHER].map(p => [p.id, p]));
+  const EXTRAS = [];
+  // Providers added to the proxy later get their own card automatically.
+  function ensure(pid) {
+    if (PMAP[pid]) return pid;
+    const p = { id: pid, name: pid.charAt(0).toUpperCase() + pid.slice(1), color: EXTRA_COLORS[EXTRAS.length % EXTRA_COLORS.length] };
+    PMAP[pid] = p; EXTRAS.push(p); return pid;
+  }
+  const allProviders = () => [...PROVIDERS, ...EXTRAS];
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem("llmdash." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
@@ -244,6 +253,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     if (/groq/.test(hay)) return "groq";
     if (/cerebras/.test(hay)) return "cerebras";
     if (/openrouter/.test(hay)) return "openrouter";
+    const cp = String(r.custom_llm_provider || "").toLowerCase().replace(/_(chat|text|completion)$/, "");
+    if (cp && !["openai", "custom_openai", "litellm_proxy"].includes(cp)) return ensure(cp.replace(/[^a-z0-9_-]/g, ""));
+    const host = (String(r.api_base || "").match(/^https?:\/\/([^\/:]+)/) || [])[1];
+    if (host) { const parts = host.split("."); return ensure(parts.length >= 2 ? parts[parts.length - 2] : host); }
+    const pre = String(r.model || "").split("/")[0].toLowerCase();
+    if (pre && pre !== String(r.model || "").toLowerCase()) return ensure(pre.replace(/[^a-z0-9_-]/g, ""));
     return "other";
   }
   function isFailure(r) {
@@ -286,8 +301,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     for (let i = 0; i < range; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(dayKey(d)); }
     const todayKey = dayKey(new Date());
     const byProv = {}, byDay = {}, byModel = {};
-    for (const p of [...PROVIDERS, OTHER]) byProv[p.id] = { req: 0, ok: 0, fail: 0, tokens: 0, lat: [], today: 0, last: null };
-    for (const d of days) byDay[d] = Object.fromEntries([...PROVIDERS, OTHER].map(p => [p.id, 0]));
+    rows.forEach(r => providerOf(r));
+    for (const p of [...allProviders(), OTHER]) byProv[p.id] = { req: 0, ok: 0, fail: 0, tokens: 0, lat: [], today: 0, last: null };
+    for (const d of days) byDay[d] = Object.fromEntries([...allProviders(), OTHER].map(p => [p.id, 0]));
     for (const r of rows) {
       const t = parseTime(r.startTime); if (!t) continue;
       const pid = providerOf(r); const P = byProv[pid];
@@ -322,17 +338,17 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const total = all.reduce((a, p) => a + p.req, 0);
     const fails = all.reduce((a, p) => a + p.fail, 0);
     const tokens = all.reduce((a, p) => a + p.tokens, 0);
-    const active = PROVIDERS.filter(p => S.byProv[p.id].req > 0).length;
+    const active = allProviders().filter(p => S.byProv[p.id].req > 0).length;
     const rangeLabel = range === 1 ? "today" : `last ${range} days`;
 
     $("kpis").innerHTML = [
       ["Requests", fmt(total), rangeLabel],
       ["Success rate", total ? (Math.round(((total - fails) / total) * 1000) / 10) + "%" : "—", fails ? `${fmt(fails)} failed` : "no failures"],
       ["Tokens", fmt(tokens), "prompt + completion"],
-      ["Providers used", `${active} of ${PROVIDERS.length}`, rangeLabel],
+      ["Providers used", `${active} of ${allProviders().length}`, rangeLabel],
     ].map(([l, v, n]) => `<div class="card kpi"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join("");
 
-    const provList = S.byProv.other.req ? [...PROVIDERS, OTHER] : PROVIDERS;
+    const provList = S.byProv.other.req ? [...allProviders(), OTHER] : allProviders();
     $("providers").innerHTML = provList.map(p => {
       const P = S.byProv[p.id];
       const lim = Number(limits[p.id]) || 0;
@@ -371,7 +387,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       models.map(m => `<tr><td><span class="swatch" style="background:${PMAP[m.pid].color};margin-right:6px"></span>${esc(m.model)}</td><td class="num">${fmt(m.req)}</td><td class="num">${fmt(m.fail)}</td><td class="num">${fmt(m.tokens)}</td></tr>`).join("")
     }</tbody></table>` : `<div class="empty">No requests yet in this range.</div>`;
 
-    $("limits").innerHTML = `<table><tbody>${PROVIDERS.map(p => `<tr><td><span class="swatch" style="background:${p.color};margin-right:6px"></span>${p.name}</td>
+    $("limits").innerHTML = `<table><tbody>${allProviders().map(p => `<tr><td><span class="swatch" style="background:${p.color};margin-right:6px"></span>${p.name}</td>
       <td class="num"><input type="number" min="0" step="1" data-lim="${p.id}" value="${limits[p.id] ?? ""}" placeholder="—" aria-label="${p.name} daily request limit"> req/day</td></tr>`).join("")}</tbody></table>
       <p class="sub" style="margin:8px 0 0">Look up each provider's current free-tier limit in its console and enter it here. Saved on this device only.</p>`;
     document.querySelectorAll("[data-lim]").forEach(inp => inp.addEventListener("change", e => {
