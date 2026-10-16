@@ -21,6 +21,8 @@
   --groq: #eb6834;
   --cerebras: #1baf7a;
   --openrouter: #eda100;
+  --cloudflare: #e87ba4;
+  --cohere: #008300;
   --other: #8a8984;
   --good: #0ca30c;
   --warning: #fab219;
@@ -42,6 +44,8 @@
     --groq: #d95926;
     --cerebras: #199e70;
     --openrouter: #c98500;
+    --cloudflare: #d55181;
+    --cohere: #008300;
     --other: #77766f;
   }
 }
@@ -50,7 +54,7 @@
   --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --border: #2f2f2c;
   --text: #f0efec; --text-2: #c3c2b7; --text-3: #8f8e86; --grid: #2a2a28;
   --accent: #3987e5; --gemini: #3987e5; --groq: #d95926; --cerebras: #199e70;
-  --openrouter: #c98500; --other: #77766f;
+  --openrouter: #c98500; --cloudflare: #d55181; --cohere: #008300; --other: #77766f;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -75,7 +79,7 @@ h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .kpi .label { color: var(--text-2); font-size: 12px; }
 .kpi .value { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .kpi .note { color: var(--text-3); font-size: 12px; }
-.providers { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
+.providers { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
 .prov h3 { margin: 0 0 10px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
 .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
 .prov .big { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -201,6 +205,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     { id: "groq", name: "Groq", color: "var(--groq)" },
     { id: "cerebras", name: "Cerebras", color: "var(--cerebras)" },
     { id: "openrouter", name: "OpenRouter", color: "var(--openrouter)" },
+    { id: "cloudflare", name: "Cloudflare", color: "var(--cloudflare)" },
+    { id: "cohere", name: "Cohere", color: "var(--cohere)" },
   ];
   const OTHER = { id: "other", name: "Other", color: "var(--other)" };
   const PMAP = Object.fromEntries([...PROVIDERS, OTHER].map(p => [p.id, p]));
@@ -232,6 +238,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   function providerOf(r) {
     const hay = [r.custom_llm_provider, r.model, r.api_base, r.model_id].filter(Boolean).join(" ").toLowerCase();
+    if (/cloudflare|@cf\//.test(hay)) return "cloudflare";
+    if (/cohere/.test(hay)) return "cohere";
     if (/gemini|generativelanguage|vertex/.test(hay)) return "gemini";
     if (/groq/.test(hay)) return "groq";
     if (/cerebras/.test(hay)) return "cerebras";
@@ -291,7 +299,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       if (k === todayKey) P.today++;
       if (!P.last || t > P.last) P.last = t;
       if (byDay[k]) byDay[k][pid]++;
-      const m = String(r.model || "unknown").replace(/^(gemini|groq|cerebras|openrouter)\//, "");
+      const m = String(r.model || "unknown").replace(/^(gemini|groq|cerebras|openrouter|cohere_chat|cohere|openai\/@cf|openai)\//, "");
       const mk = pid + "|" + m;
       byModel[mk] ??= { pid, model: m, req: 0, fail: 0, tokens: 0 };
       byModel[mk].req++; if (fail) byModel[mk].fail++;
@@ -377,7 +385,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       recent.map(r => { const pid = providerOf(r); const t = parseTime(r.startTime); const l = latencyMs(r); const f = isFailure(r);
         return `<tr><td>${t ? t.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}</td>
         <td><span class="swatch" style="background:${PMAP[pid].color};margin-right:6px"></span>${PMAP[pid].name}</td>
-        <td>${esc(String(r.model || "").replace(/^(gemini|groq|cerebras|openrouter)\//, ""))}</td>
+        <td>${esc(String(r.model || "").replace(/^(gemini|groq|cerebras|openrouter|cohere_chat|cohere|openai\/@cf|openai)\//, ""))}</td>
         <td class="num">${fmt(Number(r.total_tokens) || 0)}</td>
         <td class="num">${l == null ? "—" : (l / 1000).toFixed(1) + " s"}</td>
         <td><span class="status"><i style="background:${f ? "var(--critical)" : "var(--good)"}"></i>${f ? "Failed" : "OK"}</span></td></tr>`; }).join("")
